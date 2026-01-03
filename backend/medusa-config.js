@@ -132,7 +132,24 @@ const medusaConfig = {
           },
         ],
       },
-    }] : [])
+}] : []),
+    // 4Over Fulfillment Provider
+    {
+      key: Modules.FULFILLMENT,
+      resolve: '@medusajs/fulfillment',
+      options: {
+        providers: [
+          {
+            resolve: './src/modules/fourover',
+            id: 'fourover',
+            options: {
+              publicKey: process.env.FOUROVER_PUBLIC_KEY,
+              privateKey: process.env.FOUROVER_PRIVATE_KEY,
+            },
+          },
+        ],
+      },
+    }
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{
