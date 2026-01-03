@@ -134,7 +134,7 @@ class FourOverFulfillmentService extends AbstractFulfillmentProviderService {
     return
   }
 
-  async getFulfillmentDocuments(data: any): Promise<any[]> {
+  async getFulfillmentDocuments(data: any): Promise<never[]> {
     return []
   }
 
