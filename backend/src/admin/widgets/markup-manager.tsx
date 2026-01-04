@@ -1,5 +1,4 @@
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
-import { Container, Heading, Text, Button, Input, Table, Badge } from "@medusajs/ui"
 import { useEffect, useState } from "react"
 
 const FOUROVER_CATEGORIES = [
@@ -107,93 +106,131 @@ const MarkupManagerWidget = () => {
   }
 
   if (loading) {
-    return (
-      <Container>
-        <Text>Loading markup configuration...</Text>
-      </Container>
-    )
+    return <div style={{ padding: "20px" }}>Loading markup configuration...</div>
   }
 
   return (
-    <Container>
-      <div className="flex flex-col gap-y-4">
-        <div className="flex items-center justify-between">
-          <Heading level="h2">4Over Markup Manager</Heading>
-          <Button onClick={handleSave} isLoading={saving}>
-            Save Configuration
-          </Button>
-        </div>
-
-        <div className="bg-ui-bg-subtle p-4 rounded-lg">
-          <Text className="font-medium mb-2">Default Markup</Text>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              value={defaultMarkup}
-              onChange={(e) => setDefaultMarkup(e.target.value)}
-              className="w-24"
-            />
-            <Text>%</Text>
-          </div>
-          <Text className="text-ui-fg-subtle text-sm mt-1">
-            Applied when no category or product markup is set
-          </Text>
-        </div>
-
-        <div>
-          <Text className="font-medium mb-2">Category Markups</Text>
-          <Table>
-            <Table.Header>
-              <Table.Row>
-                <Table.HeaderCell>Category</Table.HeaderCell>
-                <Table.HeaderCell>Markup %</Table.HeaderCell>
-                <Table.HeaderCell>Actions</Table.HeaderCell>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {FOUROVER_CATEGORIES.map((cat) => (
-                <Table.Row key={cat.id}>
-                  <Table.Cell>{cat.name}</Table.Cell>
-                  <Table.Cell>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        value={categoryMarkups[cat.id] || ""}
-                        onChange={(e) =>
-                          setCategoryMarkups({
-                            ...categoryMarkups,
-                            [cat.id]: e.target.value,
-                          })
-                        }
-                        placeholder={defaultMarkup}
-                        className="w-20"
-                      />
-                      <Text>%</Text>
-                    </div>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Button
-                      variant="secondary"
-                      size="small"
-                      onClick={() => handleSync(cat.id, cat.name)}
-                      isLoading={syncing === cat.id}
-                    >
-                      Sync Products
-                    </Button>
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table>
-        </div>
-
-        {config?.updated_at && (
-          <Text className="text-ui-fg-subtle text-sm">
-            Last updated: {new Date(config.updated_at).toLocaleString()}
-          </Text>
-        )}
+    <div style={{ 
+      padding: "24px", 
+      backgroundColor: "#1a1a2e", 
+      borderRadius: "8px", 
+      marginBottom: "24px",
+      color: "#fff"
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 600 }}>4Over Markup Manager</h2>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#7c3aed",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            cursor: saving ? "not-allowed" : "pointer",
+            opacity: saving ? 0.7 : 1,
+          }}
+        >
+          {saving ? "Saving..." : "Save Configuration"}
+        </button>
       </div>
-    </Container>
+
+      <div style={{ 
+        backgroundColor: "#252542", 
+        padding: "16px", 
+        borderRadius: "6px", 
+        marginBottom: "20px" 
+      }}>
+        <label style={{ display: "block", marginBottom: "8px", fontWeight: 500 }}>Default Markup</label>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <input
+            type="number"
+            value={defaultMarkup}
+            onChange={(e) => setDefaultMarkup(e.target.value)}
+            style={{
+              width: "80px",
+              padding: "8px",
+              borderRadius: "4px",
+              border: "1px solid #444",
+              backgroundColor: "#1a1a2e",
+              color: "#fff",
+            }}
+          />
+          <span>%</span>
+        </div>
+        <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#888" }}>
+          Applied when no category or product markup is set
+        </p>
+      </div>
+
+      <div>
+        <h3 style={{ marginBottom: "12px", fontWeight: 500 }}>Category Markups</h3>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid #333" }}>
+              <th style={{ textAlign: "left", padding: "12px 8px", color: "#888" }}>Category</th>
+              <th style={{ textAlign: "left", padding: "12px 8px", color: "#888" }}>Markup %</th>
+              <th style={{ textAlign: "left", padding: "12px 8px", color: "#888" }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {FOUROVER_CATEGORIES.map((cat) => (
+              <tr key={cat.id} style={{ borderBottom: "1px solid #252542" }}>
+                <td style={{ padding: "12px 8px" }}>{cat.name}</td>
+                <td style={{ padding: "12px 8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <input
+                      type="number"
+                      value={categoryMarkups[cat.id] || ""}
+                      onChange={(e) =>
+                        setCategoryMarkups({
+                          ...categoryMarkups,
+                          [cat.id]: e.target.value,
+                        })
+                      }
+                      placeholder={defaultMarkup}
+                      style={{
+                        width: "70px",
+                        padding: "6px",
+                        borderRadius: "4px",
+                        border: "1px solid #444",
+                        backgroundColor: "#1a1a2e",
+                        color: "#fff",
+                      }}
+                    />
+                    <span>%</span>
+                  </div>
+                </td>
+                <td style={{ padding: "12px 8px" }}>
+                  <button
+                    onClick={() => handleSync(cat.id, cat.name)}
+                    disabled={syncing === cat.id}
+                    style={{
+                      padding: "6px 12px",
+                      backgroundColor: syncing === cat.id ? "#444" : "#374151",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: syncing === cat.id ? "not-allowed" : "pointer",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {syncing === cat.id ? "Syncing..." : "Sync Products"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {config?.updated_at && (
+        <p style={{ marginTop: "16px", fontSize: "12px", color: "#666" }}>
+          Last updated: {new Date(config.updated_at).toLocaleString()}
+        </p>
+      )}
+    </div>
   )
 }
 
