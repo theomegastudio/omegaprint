@@ -1,26 +1,33 @@
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
 import { useEffect, useState } from "react"
 
-const FOUROVER_CATEGORIES = [
-  { id: "08a9625a-4152-40cf-9007-b2bbb349efec", name: "Business Cards" },
-  { id: "4edd37b2-c6d5-4938-b6c7-35e09cd7bf76", name: "Flyers and Brochures" },
-  { id: "35170807-4aa5-4d13-986f-c0e266a5d685", name: "Indoor Banner" },
-  { id: "393c5a2d-8be0-4134-9161-aa35fdc60685", name: "Large Posters" },
-  { id: "5cacc269-e6a8-472d-91d6-792c4584cae8", name: "Door Hangers" },
-  { id: "56c6dd85-d838-4ca0-9f9d-e3a63e594f98", name: "Hang Tags" },
-  { id: "5502b7a1-cffc-4069-bc2e-7171c86ebdb6", name: "Letterheads" },
-  { id: "19a9a6c8-a8c8-4d0c-b4fc-8a231c1bdd53", name: "Magnets" },
-  { id: "059ea2cb-f0c5-4853-9724-a8815a2f6b48", name: "Menus" },
-  { id: "2e6a67e3-dd44-46c4-a183-e873b9f691a6", name: "Calendars" },
-]
+type Category = {
+  id: string
+  name: string
+}
 
 const MarkupManagerWidget = () => {
+  const [categories, setCategories] = useState<Category[]>([])
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState<string | null>(null)
   const [defaultMarkup, setDefaultMarkup] = useState("40")
   const [categoryMarkups, setCategoryMarkups] = useState<Record<string, string>>({})
+  const [enabledCategories, setEnabledCategories] = useState<Record<string, boolean>>({})
+  const [showDisabled, setShowDisabled] = useState(false)
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch("/test/fourover/categories")
+      const data = await response.json()
+      if (data.success) {
+        setCategories(data.categories)
+      }
+    } catch (error) {
+      console.error("Failed to fetch categories:", error)
+    }
+  }
 
   const fetchConfig = async () => {
     try {
@@ -31,31 +38,35 @@ const MarkupManagerWidget = () => {
         setDefaultMarkup(String(data.config.default_markup * 100))
         
         const markups: Record<string, string> = {}
+        const enabled: Record<string, boolean> = {}
+        
         for (const [id, value] of Object.entries(data.config.category_markups || {})) {
           markups[id] = String((value as any).markup * 100)
+          enabled[id] = (value as any).enabled !== false
         }
+        
         setCategoryMarkups(markups)
+        setEnabledCategories(enabled)
       }
     } catch (error) {
       console.error("Failed to fetch markup config:", error)
-    } finally {
-      setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchConfig()
+    Promise.all([fetchCategories(), fetchConfig()]).finally(() => setLoading(false))
   }, [])
 
   const handleSave = async () => {
     setSaving(true)
     try {
       const categoryMarkupsPayload: Record<string, any> = {}
-      for (const cat of FOUROVER_CATEGORIES) {
-        if (categoryMarkups[cat.id]) {
+      for (const cat of categories) {
+        if (categoryMarkups[cat.id] || enabledCategories[cat.id] !== undefined) {
           categoryMarkupsPayload[cat.id] = {
             name: cat.name,
-            markup: parseFloat(categoryMarkups[cat.id]) / 100,
+            markup: parseFloat(categoryMarkups[cat.id] || defaultMarkup) / 100,
+            enabled: enabledCategories[cat.id] !== false,
           }
         }
       }
@@ -105,130 +116,177 @@ const MarkupManagerWidget = () => {
     }
   }
 
-  if (loading) {
-    return <div style={{ padding: "20px" }}>Loading markup configuration...</div>
+  const toggleCategory = (categoryId: string) => {
+    setEnabledCategories({
+      ...enabledCategories,
+      [categoryId]: !enabledCategories[categoryId],
+    })
   }
 
+  const enableAll = () => {
+    const allEnabled: Record<string, boolean> = {}
+    categories.forEach(cat => { allEnabled[cat.id] = true })
+    setEnabledCategories(allEnabled)
+  }
+
+  const disableAll = () => {
+    const allDisabled: Record<string, boolean> = {}
+    categories.forEach(cat => { allDisabled[cat.id] = false })
+    setEnabledCategories(allDisabled)
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-ui-bg-base border-ui-border-base rounded-lg border p-6 mb-4">
+        <p className="text-ui-fg-subtle">Loading markup configuration...</p>
+      </div>
+    )
+  }
+
+  const enabledCount = categories.filter(cat => enabledCategories[cat.id] !== false).length
+  const displayCategories = showDisabled 
+    ? categories 
+    : categories.filter(cat => enabledCategories[cat.id] !== false)
+
   return (
-    <div style={{ 
-      padding: "24px", 
-      backgroundColor: "#1a1a2e", 
-      borderRadius: "8px", 
-      marginBottom: "24px",
-      color: "#fff"
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 600 }}>4Over Markup Manager</h2>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{
-            padding: "8px 16px",
-            backgroundColor: "#7c3aed",
-            color: "#fff",
-            border: "none",
-            borderRadius: "6px",
-            cursor: saving ? "not-allowed" : "pointer",
-            opacity: saving ? 0.7 : 1,
-          }}
-        >
-          {saving ? "Saving..." : "Save Configuration"}
-        </button>
+    <div className="bg-ui-bg-base border-ui-border-base rounded-lg border mb-4 shadow-elevation-card-rest">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-ui-border-base">
+        <h2 className="text-ui-fg-base font-semibold text-lg">4Over Markup Manager</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { fetchCategories(); fetchConfig(); }}
+            className="px-3 py-1.5 text-sm font-medium rounded-md border border-ui-border-base bg-ui-bg-base text-ui-fg-base hover:bg-ui-bg-base-hover transition-colors"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm font-medium rounded-md border border-ui-border-base bg-ui-bg-base text-ui-fg-base hover:bg-ui-bg-base-hover disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Saving..." : "Save Configuration"}
+          </button>
+        </div>
       </div>
 
-      <div style={{ 
-        backgroundColor: "#252542", 
-        padding: "16px", 
-        borderRadius: "6px", 
-        marginBottom: "20px" 
-      }}>
-        <label style={{ display: "block", marginBottom: "8px", fontWeight: 500 }}>Default Markup</label>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      {/* Default Markup */}
+      <div className="px-6 py-4 border-b border-ui-border-base bg-ui-bg-subtle">
+        <label className="block text-sm font-medium text-ui-fg-base mb-2">Default Markup</label>
+        <div className="flex items-center gap-2">
           <input
             type="number"
             value={defaultMarkup}
             onChange={(e) => setDefaultMarkup(e.target.value)}
-            style={{
-              width: "80px",
-              padding: "8px",
-              borderRadius: "4px",
-              border: "1px solid #444",
-              backgroundColor: "#1a1a2e",
-              color: "#fff",
-            }}
+            className="w-20 px-2 py-1.5 text-sm rounded-md border border-ui-border-base bg-ui-bg-field text-ui-fg-base focus:outline-none focus:border-ui-border-interactive"
           />
-          <span>%</span>
+          <span className="text-ui-fg-subtle text-sm">%</span>
         </div>
-        <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#888" }}>
-          Applied when no category or product markup is set
-        </p>
+        <p className="text-ui-fg-muted text-xs mt-1">Applied when no category markup is set</p>
       </div>
 
-      <div>
-        <h3 style={{ marginBottom: "12px", fontWeight: 500 }}>Category Markups</h3>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #333" }}>
-              <th style={{ textAlign: "left", padding: "12px 8px", color: "#888" }}>Category</th>
-              <th style={{ textAlign: "left", padding: "12px 8px", color: "#888" }}>Markup %</th>
-              <th style={{ textAlign: "left", padding: "12px 8px", color: "#888" }}>Actions</th>
+      {/* Category Controls */}
+      <div className="px-6 py-3 border-b border-ui-border-base flex items-center justify-between">
+        <h3 className="text-ui-fg-base font-medium text-sm">Category Markups</h3>
+        <div className="flex items-center gap-4">
+          <span className="text-ui-fg-muted text-xs">{enabledCount} of {categories.length} enabled</span>
+          <div className="flex gap-2">
+            <button
+              onClick={enableAll}
+              className="px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base text-ui-fg-base hover:bg-ui-bg-base-hover transition-colors"
+            >
+              Enable All
+            </button>
+            <button
+              onClick={disableAll}
+              className="px-2 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base text-ui-fg-base hover:bg-ui-bg-base-hover transition-colors"
+            >
+              Disable All
+            </button>
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-ui-fg-subtle cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showDisabled}
+              onChange={(e) => setShowDisabled(e.target.checked)}
+              className="rounded border-ui-border-base"
+            />
+            Show disabled
+          </label>
+        </div>
+      </div>
+
+      {/* Categories Table */}
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full">
+          <thead className="sticky top-0 bg-ui-bg-base border-b border-ui-border-base">
+            <tr>
+              <th className="text-left px-6 py-3 text-xs font-medium text-ui-fg-muted uppercase tracking-wider w-16">On</th>
+              <th className="text-left px-6 py-3 text-xs font-medium text-ui-fg-muted uppercase tracking-wider">Category</th>
+              <th className="text-left px-6 py-3 text-xs font-medium text-ui-fg-muted uppercase tracking-wider w-32">Markup</th>
+              <th className="text-left px-6 py-3 text-xs font-medium text-ui-fg-muted uppercase tracking-wider w-32">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {FOUROVER_CATEGORIES.map((cat) => (
-              <tr key={cat.id} style={{ borderBottom: "1px solid #252542" }}>
-                <td style={{ padding: "12px 8px" }}>{cat.name}</td>
-                <td style={{ padding: "12px 8px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <tbody className="divide-y divide-ui-border-base">
+            {displayCategories.map((cat) => {
+              const isEnabled = enabledCategories[cat.id] !== false
+              return (
+                <tr 
+                  key={cat.id} 
+                  className={`hover:bg-ui-bg-base-hover transition-colors ${!isEnabled ? 'opacity-50' : ''}`}
+                >
+                  <td className="px-6 py-3">
                     <input
-                      type="number"
-                      value={categoryMarkups[cat.id] || ""}
-                      onChange={(e) =>
-                        setCategoryMarkups({
-                          ...categoryMarkups,
-                          [cat.id]: e.target.value,
-                        })
-                      }
-                      placeholder={defaultMarkup}
-                      style={{
-                        width: "70px",
-                        padding: "6px",
-                        borderRadius: "4px",
-                        border: "1px solid #444",
-                        backgroundColor: "#1a1a2e",
-                        color: "#fff",
-                      }}
+                      type="checkbox"
+                      checked={isEnabled}
+                      onChange={() => toggleCategory(cat.id)}
+                      className="rounded border-ui-border-base w-4 h-4 cursor-pointer"
                     />
-                    <span>%</span>
-                  </div>
-                </td>
-                <td style={{ padding: "12px 8px" }}>
-                  <button
-                    onClick={() => handleSync(cat.id, cat.name)}
-                    disabled={syncing === cat.id}
-                    style={{
-                      padding: "6px 12px",
-                      backgroundColor: syncing === cat.id ? "#444" : "#374151",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: syncing === cat.id ? "not-allowed" : "pointer",
-                      fontSize: "13px",
-                    }}
-                  >
-                    {syncing === cat.id ? "Syncing..." : "Sync Products"}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-6 py-3">
+                    <span className="text-sm text-ui-fg-base">{cat.name}</span>
+                  </td>
+                  <td className="px-6 py-3">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={categoryMarkups[cat.id] || ""}
+                        onChange={(e) =>
+                          setCategoryMarkups({
+                            ...categoryMarkups,
+                            [cat.id]: e.target.value,
+                          })
+                        }
+                        placeholder={defaultMarkup}
+                        disabled={!isEnabled}
+                        className="w-16 px-2 py-1 text-sm rounded border border-ui-border-base bg-ui-bg-field text-ui-fg-base focus:outline-none focus:border-ui-border-interactive disabled:opacity-50"
+                      />
+                      <span className="text-ui-fg-muted text-xs">%</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-3">
+                    <button
+                      onClick={() => handleSync(cat.id, cat.name)}
+                      disabled={syncing === cat.id || !isEnabled}
+                      className="px-2.5 py-1 text-xs font-medium rounded border border-ui-border-base bg-ui-bg-base text-ui-fg-base hover:bg-ui-bg-base-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {syncing === cat.id ? "Syncing..." : "Sync"}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
+      {/* Footer */}
       {config?.updated_at && (
-        <p style={{ marginTop: "16px", fontSize: "12px", color: "#666" }}>
-          Last updated: {new Date(config.updated_at).toLocaleString()}
-        </p>
+        <div className="px-6 py-3 border-t border-ui-border-base">
+          <p className="text-ui-fg-muted text-xs">
+            Last updated: {new Date(config.updated_at).toLocaleString()}
+          </p>
+        </div>
       )}
     </div>
   )
